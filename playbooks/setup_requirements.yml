@@ -1,6 +1,7 @@
 ---
 - name: Setup requirements
   hosts: migrator
+  become: true
   tasks:
     - name: Copy clouds.yaml to os-migrate data dir
       ansible.builtin.copy:
@@ -43,7 +44,6 @@
         create: false
         backup: true
       become: true
-      become_method: su
       when: custom_hosts is defined and custom_hosts | length > 0
 
     - name: Configure DNS servers in /etc/resolv.conf
@@ -58,5 +58,4 @@
         create: false
         backup: true
       become: true
-      become_method: su
       when: custom_dns_servers is defined and custom_dns_servers | length > 0
