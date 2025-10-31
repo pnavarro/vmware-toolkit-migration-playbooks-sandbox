@@ -32,25 +32,40 @@
         - aiohttp
       when: not runner_from_aee | default(false)
 
+    - name: Read current /etc/hosts content
+      ansible.builtin.slurp:
+        src: /etc/hosts
+      register: current_hosts
+      when: custom_hosts is defined and custom_hosts | length > 0
+
     - name: Add custom hosts to /etc/hosts
-      ansible.builtin.blockinfile:
-        path: /etc/hosts
-        block: |
+      ansible.builtin.copy:
+        content: |
+          {{ current_hosts.content | b64decode }}
+          # BEGIN ANSIBLE MANAGED BLOCK - Custom Hosts
           {% for host in custom_hosts | default([]) %}
           {{ host.ip }} {{ host.hostname }}
           {% endfor %}
-        marker: "# {mark} ANSIBLE MANAGED BLOCK - Custom Hosts"
-        create: false
+          # END ANSIBLE MANAGED BLOCK - Custom Hosts
+        dest: /etc/hosts
+        unsafe_writes: true
+        mode: '0644'
       when: custom_hosts is defined and custom_hosts | length > 0
 
+    - name: Read current /etc/resolv.conf content
+      ansible.builtin.slurp:
+        src: /etc/resolv.conf
+      register: current_resolv
+      when: custom_dns_servers is defined and custom_dns_servers | length > 0
+
     - name: Configure DNS servers in /etc/resolv.conf
-      ansible.builtin.blockinfile:
-        path: /etc/resolv.conf
-        block: |
+      ansible.builtin.copy:
+        content: |
           {% for dns in custom_dns_servers | default([]) %}
           nameserver {{ dns }}
           {% endfor %}
-        marker: "# {mark} ANSIBLE MANAGED BLOCK - Custom DNS"
-        insertbefore: BOF
-        create: false
+          {{ current_resolv.content | b64decode }}
+        dest: /etc/resolv.conf
+        unsafe_writes: true
+        mode: '0644'
       when: custom_dns_servers is defined and custom_dns_servers | length > 0
