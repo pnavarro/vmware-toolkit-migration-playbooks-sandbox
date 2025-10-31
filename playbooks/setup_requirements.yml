@@ -32,40 +32,49 @@
         - aiohttp
       when: not runner_from_aee | default(false)
 
-    - name: Read current /etc/hosts content
-      ansible.builtin.slurp:
-        src: /etc/hosts
-      register: current_hosts
+    - name: Add custom host entries to in-memory hosts mapping
+      ansible.builtin.add_host:
+        name: "{{ item.hostname }}"
+        ansible_host: "{{ item.ip }}"
+        groups: custom_hosts_group
+      loop: "{{ custom_hosts | default([]) }}"
       when: custom_hosts is defined and custom_hosts | length > 0
+      changed_when: false
 
-    - name: Add custom hosts to /etc/hosts
-      ansible.builtin.copy:
-        content: |
-          {{ current_hosts.content | b64decode }}
-          # BEGIN ANSIBLE MANAGED BLOCK - Custom Hosts
+    - name: Display custom hosts configuration
+      ansible.builtin.debug:
+        msg: |
+          Custom host entries configured in Ansible inventory:
           {% for host in custom_hosts | default([]) %}
-          {{ host.ip }} {{ host.hostname }}
+          - {{ host.hostname }}: {{ host.ip }}
           {% endfor %}
-          # END ANSIBLE MANAGED BLOCK - Custom Hosts
-        dest: /etc/hosts
-        unsafe_writes: true
-        mode: '0644'
+          
+          Note: For AAP/Execution Environments, configure these in:
+          1. Job Template -> Extra Vars -> Add container_options
+          2. Execution Environment definition with podman_extra_args
+          Example:
+            container_options:
+              extra_hosts:
+          {% for host in custom_hosts | default([]) %}
+                - "{{ host.hostname }}:{{ host.ip }}"
+          {% endfor %}
       when: custom_hosts is defined and custom_hosts | length > 0
 
-    - name: Read current /etc/resolv.conf content
-      ansible.builtin.slurp:
-        src: /etc/resolv.conf
-      register: current_resolv
-      when: custom_dns_servers is defined and custom_dns_servers | length > 0
-
-    - name: Configure DNS servers in /etc/resolv.conf
-      ansible.builtin.copy:
-        content: |
+    - name: Display custom DNS configuration
+      ansible.builtin.debug:
+        msg: |
+          Custom DNS servers requested:
           {% for dns in custom_dns_servers | default([]) %}
-          nameserver {{ dns }}
+          - {{ dns }}
           {% endfor %}
-          {{ current_resolv.content | b64decode }}
-        dest: /etc/resolv.conf
-        unsafe_writes: true
-        mode: '0644'
+          
+          Note: For AAP/Execution Environments, configure these in:
+          1. Job Template -> Extra Vars -> Add container_options
+          2. Execution Environment definition
+          Example:
+            container_options:
+              dns:
+          {% for dns in custom_dns_servers | default([]) %}
+                - "{{ dns }}"
+          {% endfor %}
       when: custom_dns_servers is defined and custom_dns_servers | length > 0
